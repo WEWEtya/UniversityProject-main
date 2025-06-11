@@ -1,10 +1,12 @@
 // --- Encryption and Decryption Functions ---
 const secretKey = "secret_key";
 
+// Encrypts a password using AES
 function encryptPassword(password) {
     return CryptoJS.AES.encrypt(password, secretKey).toString();
 }
 
+// Decrypts an AES-encrypted password
 function decryptPassword(encrypted) {
     const bytes = CryptoJS.AES.decrypt(encrypted, secretKey);
     return bytes.toString(CryptoJS.enc.Utf8);
@@ -21,16 +23,19 @@ function generatePassword(length = 12) {
 }
 
 // --- Local Storage Helpers ---
+// Loads passwords for a user from localStorage
 function loadPasswords(userId) {
     const saved = localStorage.getItem(userId + '_passwordEntries');
     return saved ? JSON.parse(saved) : [];
 }
 
+// Saves passwords for a user to localStorage
 function savePasswords(userId, passwords) {
     localStorage.setItem(userId + '_passwordEntries', JSON.stringify(passwords));
 }
 
 // --- UI Rendering ---
+// Renders the password table for the logged-in user
 function renderPasswords(userId) {
     const tableBody = document.getElementById('password_table').getElementsByTagName('tbody')[0];
     const passwords = loadPasswords(userId);
@@ -52,27 +57,33 @@ function renderPasswords(userId) {
         // Service
         const serviceCell = document.createElement('td');
         serviceCell.textContent = entry.service;
+        serviceCell.setAttribute('data-label', 'Serwis');
         row.appendChild(serviceCell);
 
         // Username/Email
         const usernameCell = document.createElement('td');
         usernameCell.textContent = entry.username;
+        usernameCell.setAttribute('data-label', 'Użytkownik/Email');
         row.appendChild(usernameCell);
 
-        // Password (decrypted, shown directly)
+        // Password (decrypted)
         const passwordCell = document.createElement('td');
         passwordCell.textContent = decryptPassword(entry.password);
+        passwordCell.setAttribute('data-label', 'Hasło');
         row.appendChild(passwordCell);
 
-        // Actions
+        // Actions (Edit & Delete)
         const actionsCell = document.createElement('td');
-        // Edit
+        actionsCell.setAttribute('data-label', 'Akcje');
+
+        // Edit button
         const editButton = document.createElement('button');
         editButton.classList.add('edit');
         editButton.textContent = 'Edytuj';
         editButton.onclick = () => editPassword(userId, idx);
         actionsCell.appendChild(editButton);
-        // Delete
+
+        // Delete button
         const deleteButton = document.createElement('button');
         deleteButton.classList.add('delete');
         deleteButton.textContent = 'Usuń';
@@ -85,6 +96,7 @@ function renderPasswords(userId) {
 }
 
 // --- CRUD Operations ---
+// Adds a new password entry
 function addPasswordEntry(userId, service, username, password) {
     const passwords = loadPasswords(userId);
     const encryptedPassword = encryptPassword(password);
@@ -93,6 +105,7 @@ function addPasswordEntry(userId, service, username, password) {
     renderPasswords(userId);
 }
 
+// Deletes a password entry by index
 function deletePassword(userId, idx) {
     const passwords = loadPasswords(userId);
     passwords.splice(idx, 1);
@@ -100,14 +113,13 @@ function deletePassword(userId, idx) {
     renderPasswords(userId);
 }
 
+// Edits a password entry by index (fills form, removes old entry)
 function editPassword(userId, idx) {
     const passwords = loadPasswords(userId);
     const entry = passwords[idx];
-    // Fill form with entry data
     document.getElementById('service_name').value = entry.service;
     document.getElementById('username_email').value = entry.username;
     document.getElementById('password').value = decryptPassword(entry.password);
-    // Remove entry (will be re-added on submit)
     deletePassword(userId, idx);
 }
 
@@ -153,15 +165,14 @@ document.getElementById('logout_button').addEventListener('click', () => {
 });
 
 // --- Initial UI State ---
+// Show/hide sections based on login status
 window.addEventListener('load', () => {
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (loggedInUser) {
-        // Show password manager
         renderPasswords(loggedInUser);
         document.getElementById('login_section').style.display = 'none';
         document.getElementById('password_section').style.display = 'block';
     } else {
-        // Show login screen, hide password manager
         document.getElementById('login_section').style.display = 'block';
         document.getElementById('password_section').style.display = 'none';
         // Clear password table

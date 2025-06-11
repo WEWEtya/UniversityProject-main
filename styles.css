@@ -88,3 +88,56 @@ button.edit:hover {
 .logout_btn:hover {
     background-color: #e40101;
 }
+
+@media (max-width: 600px) {
+    body {
+        padding: 10px;
+        max-width: 90%;
+    }
+
+    h1, h2 {
+        font-size: 1.3em;
+    }
+
+    form input {
+        width: 92.6%;
+        padding: 10px;
+        font-size: 1em;
+    }
+
+    form button, button.delete, button.edit, .logout_btn {
+        width: 100%;
+        margin: 6px 0;
+        padding: 12px;
+        font-size: 1em;
+        float: none;
+    }
+
+    table, thead, tbody, th, td, tr {
+        display: block;
+        width: 99;
+    }
+
+    thead {
+        display: none;
+    }
+
+    tr {
+        margin-bottom: 18px;
+        border-bottom: 2px solid #eee;
+    }
+
+    td {
+        padding: 10px;
+        text-align: left;
+        position: relative;
+    }
+
+    td:before {
+        content: attr(data-label);
+        font-weight: bold;
+        display: block;
+        margin-bottom: 4px;
+        color: #555;
+    }
+}
