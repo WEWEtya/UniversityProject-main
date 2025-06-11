@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Generator haseł</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <div id="login_section">
+        <h1>Login</h1>
+        <form id="login_form">
+            <input type="text" id="user_id" placeholder="Wpisz swój identyfikator (np. email)" required />
+            <button type="submit">Zaloguj się</button>
+        </form>
+    </div>
+
+    <div id="password_section">
+        <h1>Generator haseł</h1>
+        
+        <h2>Dodaj dane konta</h2>
+        <form id="password_form">
+            <input id="service_name" placeholder="Nazwa serwisu (np. Google)" type="text" required />
+            <input id="username_email" placeholder="Email / Użytkownik" type="text" required />
+            <input id="password" placeholder="Hasło" type="password" required />
+            <button type="button" id="generate_password">🔑 Wygeneruj hasło</button>
+            <button type="submit">Dodaj dane</button>
+            <button type="button" id="logout_button" class="logout_btn">Wyloguj się</button>
+        </form>
+
+        <h3>Wygenerowane hasła</h3>
+        <table id="password_table">
+            <thead>
+                <tr>
+                    <th>Serwis</th>
+                    <th>Użytkownik/Email</th>
+                    <th>Hasło</th>
+                    <th>Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Password entries will be added here dynamically -->
+            </tbody>
+        </table>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
