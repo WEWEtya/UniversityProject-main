@@ -5,18 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Manager haseł</title>
     <link rel="stylesheet" href="styles.css" />
+
+    <!-- CryptoJS for password encryption -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="firebase-init.js"></script>
+    <script type="module" src="app.js"></script>
 </head>
 <body>
-    <div id="login_section">
-        <h1>Login</h1>
-        <form id="login_form">
-            <input type="text" id="user_id" placeholder="Wpisz swój identyfikator (np. email)" required />
+    <!-- Authentication Section -->
+    <div id="auth_section">
+        <h1>Logowanie / Rejestracja</h1>
+        <form id="auth_form">
+            <input type="email" id="email" placeholder="Email" required />
+            <input type="password" id="auth_password" placeholder="Hasło" required />
             <button type="submit">Zaloguj się</button>
+            <button type="button" id="register_button">Zarejestruj się</button>
         </form>
     </div>
 
-    <div id="password_section">
+    <!-- Password Manager Section -->
+    <div id="password_section" style="display: none;">
         <h1>Manager haseł</h1>
         
         <h2>Dodaj dane konta</h2>
@@ -40,12 +50,9 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Password entries will be added here dynamically -->
+                <!-- Password entries will appear here -->
             </tbody>
         </table>
-
     </div>
-
-    <script src="app.js"></script>
 </body>
 </html>

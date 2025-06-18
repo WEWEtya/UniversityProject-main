@@ -1,182 +1,214 @@
-// --- Encryption and Decryption Functions ---
+import { db, auth } from './firebase-init.js';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
+
 const secretKey = "secret_key";
 
-// Encrypts a password using AES
+// --- Encryption ---
 function encryptPassword(password) {
-    return CryptoJS.AES.encrypt(password, secretKey).toString();
+  return CryptoJS.AES.encrypt(password, secretKey).toString();
 }
 
-// Decrypts an AES-encrypted password
 function decryptPassword(encrypted) {
-    const bytes = CryptoJS.AES.decrypt(encrypted, secretKey);
-    return bytes.toString(CryptoJS.enc.Utf8);
+  const bytes = CryptoJS.AES.decrypt(encrypted, secretKey);
+  return bytes.toString(CryptoJS.enc.Utf8);
 }
 
-// --- Password Generation ---
 function generatePassword(length = 12) {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 }
 
-// --- Local Storage Helpers ---
-// Loads passwords for a user from localStorage
-function loadPasswords(userId) {
-    const saved = localStorage.getItem(userId + '_passwordEntries');
-    return saved ? JSON.parse(saved) : [];
-}
+// --- Render passwords ---
+async function renderPasswords(userId) {
+  const tableBody = document.getElementById('password_table').getElementsByTagName('tbody')[0];
+  tableBody.innerHTML = '';
 
-// Saves passwords for a user to localStorage
-function savePasswords(userId, passwords) {
-    localStorage.setItem(userId + '_passwordEntries', JSON.stringify(passwords));
-}
+  const q = query(collection(db, 'passwords'), where("userId", "==", userId));
 
-// --- UI Rendering ---
-// Renders the password table for the logged-in user
-function renderPasswords(userId) {
-    const tableBody = document.getElementById('password_table').getElementsByTagName('tbody')[0];
-    const passwords = loadPasswords(userId);
-    tableBody.innerHTML = ''; // Clear previous entries
-
-    if (passwords.length === 0) {
-        const row = document.createElement('tr');
-        const cell = document.createElement('td');
-        cell.colSpan = 4;
-        cell.textContent = 'Brak zapisanych haseł';
-        row.appendChild(cell);
-        tableBody.appendChild(row);
-        return;
+  onSnapshot(q, (querySnapshot) => {
+    tableBody.innerHTML = '';
+    if (querySnapshot.empty) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 5;
+      cell.textContent = 'Brak zapisanych haseł';
+      row.appendChild(cell);
+      tableBody.appendChild(row);
+      return;
     }
 
-    passwords.forEach((entry, idx) => {
-        const row = document.createElement('tr');
+    querySnapshot.forEach((docSnap) => {
+      const entry = docSnap.data();
+      const row = document.createElement('tr');
 
-        // Service
-        const serviceCell = document.createElement('td');
-        serviceCell.textContent = entry.service;
-        serviceCell.setAttribute('data-label', 'Serwis');
-        row.appendChild(serviceCell);
+      const serviceCell = document.createElement('td');
+      serviceCell.textContent = entry.service;
+      row.appendChild(serviceCell);
 
-        // Username/Email
-        const usernameCell = document.createElement('td');
-        usernameCell.textContent = entry.username;
-        usernameCell.setAttribute('data-label', 'Użytkownik/Email');
-        row.appendChild(usernameCell);
+      const usernameCell = document.createElement('td');
+      usernameCell.textContent = entry.username;
+      row.appendChild(usernameCell);
 
-        // Password (decrypted)
-        const passwordCell = document.createElement('td');
-        passwordCell.textContent = decryptPassword(entry.password);
-        passwordCell.setAttribute('data-label', 'Hasło');
-        row.appendChild(passwordCell);
+      const passwordCell = document.createElement('td');
+      passwordCell.textContent = '********'; // masked by default
+      row.appendChild(passwordCell);
 
-        // Actions (Edit & Delete)
-        const actionsCell = document.createElement('td');
-        actionsCell.setAttribute('data-label', 'Akcje');
+      // Actions: Edit and Delete buttons
+      const actionsCell = document.createElement('td');
 
-        // Edit button
-        const editButton = document.createElement('button');
-        editButton.classList.add('edit');
-        editButton.textContent = 'Edytuj';
-        editButton.onclick = () => editPassword(userId, idx);
-        actionsCell.appendChild(editButton);
+      const editButton = document.createElement('button');
+      editButton.classList.add('edit');
+      editButton.textContent = 'Edytuj';
+      editButton.onclick = () => {
+        document.getElementById('service_name').value = entry.service;
+        document.getElementById('username_email').value = entry.username;
+        document.getElementById('password').value = decryptPassword(entry.password);
+        deletePassword(userId, docSnap.id);
+      };
+      actionsCell.appendChild(editButton);
 
-        // Delete button
-        const deleteButton = document.createElement('button');
-        deleteButton.classList.add('delete');
-        deleteButton.textContent = 'Usuń';
-        deleteButton.onclick = () => deletePassword(userId, idx);
-        actionsCell.appendChild(deleteButton);
+      const deleteButton = document.createElement('button');
+      deleteButton.classList.add('delete');
+      deleteButton.textContent = 'Usuń';
+      deleteButton.onclick = () => deletePassword(userId, docSnap.id);
+      actionsCell.appendChild(deleteButton);
 
-        row.appendChild(actionsCell);
-        tableBody.appendChild(row);
+      row.appendChild(actionsCell);
+
+      // Show password toggle button with re-authentication
+      const showCell = document.createElement('td');
+      const showButton = document.createElement('button');
+      showButton.textContent = 'Pokaż';
+
+      let showing = false; // state to track toggle
+
+      showButton.onclick = async () => {
+        if (showing) {
+          // Hide password
+          passwordCell.textContent = '********';
+          showButton.textContent = 'Pokaż';
+          showing = false;
+        } else {
+          const accountPassword = prompt('Wpisz hasło do swojego konta, aby wyświetlić hasło:');
+          if (!accountPassword) return;
+
+          try {
+            const user = auth.currentUser;
+            const credential = EmailAuthProvider.credential(user.email, accountPassword);
+            await reauthenticateWithCredential(user, credential);
+            passwordCell.textContent = decryptPassword(entry.password);
+            showButton.textContent = 'Ukryj';
+            showing = true;
+          } catch {
+            alert('Błędne hasło konta. Nie można wyświetlić hasła.');
+          }
+        }
+      };
+
+      showCell.appendChild(showButton);
+      row.appendChild(showCell);
+
+      tableBody.appendChild(row);
     });
+  });
 }
 
-// --- CRUD Operations ---
-// Adds a new password entry
-function addPasswordEntry(userId, service, username, password) {
-    const passwords = loadPasswords(userId);
-    const encryptedPassword = encryptPassword(password);
-    passwords.push({ service, username, password: encryptedPassword });
-    savePasswords(userId, passwords);
-    renderPasswords(userId);
+// --- Add password ---
+async function addPasswordEntry(userId, service, username, password) {
+  const encryptedPassword = encryptPassword(password);
+  await addDoc(collection(db, 'passwords'), {
+    userId,
+    service,
+    username,
+    password: encryptedPassword
+  });
 }
 
-// Deletes a password entry by index
-function deletePassword(userId, idx) {
-    const passwords = loadPasswords(userId);
-    passwords.splice(idx, 1);
-    savePasswords(userId, passwords);
-    renderPasswords(userId);
-}
-
-// Edits a password entry by index (fills form, removes old entry)
-function editPassword(userId, idx) {
-    const passwords = loadPasswords(userId);
-    const entry = passwords[idx];
-    document.getElementById('service_name').value = entry.service;
-    document.getElementById('username_email').value = entry.username;
-    document.getElementById('password').value = decryptPassword(entry.password);
-    deletePassword(userId, idx);
+// --- Delete password ---
+async function deletePassword(userId, docId) {
+  await deleteDoc(doc(db, 'passwords', docId));
 }
 
 // --- Event Listeners ---
-
-// Generate password button
 document.getElementById('generate_password').addEventListener('click', () => {
-    document.getElementById('password').value = generatePassword();
+  document.getElementById('password').value = generatePassword();
 });
 
-// Add new password entry
-document.getElementById('password_form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const service = document.getElementById('service_name').value.trim();
-    const username = document.getElementById('username_email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const userId = localStorage.getItem('loggedInUser');
-    if (service && username && password) {
-        addPasswordEntry(userId, service, username, password);
-        document.getElementById('password_form').reset();
-    } else {
-        alert('Wypełnij wszystkie pola!');
+document.getElementById('password_form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const service = document.getElementById('service_name').value.trim();
+  const username = document.getElementById('username_email').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const user = auth.currentUser;
+
+  if (service && username && password && user) {
+    await addPasswordEntry(user.uid, service, username, password);
+    document.getElementById('password_form').reset();
+    renderPasswords(user.uid);  // Refresh table immediately
+  } else {
+    alert('Wypełnij wszystkie pola!');
+  }
+});
+
+document.getElementById('register_button').addEventListener('click', async () => {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('auth_password').value.trim();
+  if (email && password) {
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      alert('Konto utworzone!');
+    } catch (err) {
+      alert('Błąd rejestracji: ' + err.message);
     }
+  } else {
+    alert('Wprowadź email i hasło.');
+  }
 });
 
-// Login
-document.getElementById('login_form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const userId = document.getElementById('user_id').value.trim();
-    if (userId) {
-        localStorage.setItem('loggedInUser', userId);
-        renderPasswords(userId);
-        window.location.reload();
-    } else {
-        alert("Wpisz identyfikator użytkownika!");
-    }
+document.getElementById('auth_form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('auth_password').value.trim();
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    alert('Błąd logowania: ' + err.message);
+  }
 });
 
-// Logout
-document.getElementById('logout_button').addEventListener('click', () => {
-    localStorage.removeItem('loggedInUser');
-    window.location.reload();
+document.getElementById('logout_button').addEventListener('click', async () => {
+  await signOut(auth);
 });
 
-// --- Initial UI State ---
-// Show/hide sections based on login status
-window.addEventListener('load', () => {
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        renderPasswords(loggedInUser);
-        document.getElementById('login_section').style.display = 'none';
-        document.getElementById('password_section').style.display = 'block';
-    } else {
-        document.getElementById('login_section').style.display = 'block';
-        document.getElementById('password_section').style.display = 'none';
-        // Clear password table
-        const tableBody = document.getElementById('password_table').getElementsByTagName('tbody')[0];
-        tableBody.innerHTML = '';
-    }
+// Refresh passwords on user state change
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    document.getElementById('auth_section').style.display = 'none';
+    document.getElementById('password_section').style.display = 'block';
+    renderPasswords(user.uid);
+  } else {
+    document.getElementById('auth_section').style.display = 'block';
+    document.getElementById('password_section').style.display = 'none';
+  }
 });
